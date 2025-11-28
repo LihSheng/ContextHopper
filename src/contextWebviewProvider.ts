@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { encodingForModel } from 'js-tiktoken';
 
 export interface ContextItem {
     id: string;
@@ -15,6 +16,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
 
     private _view?: vscode.WebviewView;
     private _items: ContextItem[] = [];
+    private _enc = encodingForModel('gpt-4');
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
@@ -94,7 +96,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
             id: Date.now().toString(),
             type: 'text',
             content: text,
-            tokens: Math.ceil(text.length / 4)
+            tokens: this._enc.encode(text).length
         };
         this._items.push(item);
         this._updateWebview();
@@ -109,7 +111,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
         vscode.commands.executeCommand('vscode.open', uri, options);
     }
 
-    private async copyAll() {
+    public async copyAll() {
         let content = '';
         for (const item of this._items) {
             if (item.type === 'file') {
@@ -136,7 +138,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
         vscode.window.showInformationMessage(`Copied ${this._items.length} items to clipboard.`);
     }
 
-    private clearAll() {
+    public clearAll() {
         this._items = [];
         this._updateWebview();
     }
@@ -169,32 +171,41 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                 #list {
                     flex: 1;
                     overflow-y: auto;
-                    padding: 10px;
+                    padding: 0;
                 }
                 .item {
-                    background-color: var(--vscode-list-hoverBackground);
-                    margin-bottom: 5px;
-                    padding: 8px;
-                    border-radius: 4px;
+                    padding: 0 10px;
+                    height: 22px;
                     display: flex;
-                    justify-content: space-between;
                     align-items: center;
-                    cursor: grab;
+                    cursor: pointer;
+                    color: var(--vscode-foreground);
                     user-select: none;
                 }
-                .item:active {
-                    cursor: grabbing;
+                .item:hover {
+                    background-color: var(--vscode-list-hoverBackground);
+                    color: var(--vscode-list-hoverForeground);
+                }
+                .item-icon {
+                    margin-right: 6px;
+                    display: flex;
+                    align-items: center;
+                    font-size: 14px;
                 }
                 .item-content {
                     flex: 1;
                     overflow: hidden;
                     text-overflow: ellipsis;
                     white-space: nowrap;
-                    cursor: pointer;
+                    font-size: 13px;
+                    line-height: 22px;
                 }
                 .item-actions {
+                    display: none;
+                    margin-left: 10px;
+                }
+                .item:hover .item-actions {
                     display: flex;
-                    gap: 5px;
                 }
                 .icon-btn {
                     cursor: pointer;
@@ -202,9 +213,13 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     background: none;
                     border: none;
                     padding: 2px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 3px;
                 }
                 .icon-btn:hover {
-                    color: var(--vscode-list-highlightForeground);
+                    background-color: var(--vscode-toolbar-hoverBackground);
                 }
                 #footer {
                     padding: 10px;
@@ -218,28 +233,43 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     text-align: right;
                 }
                 #input-area {
-                    display: flex;
-                    gap: 5px;
+                    position: relative;
+                    margin-top: 5px;
                 }
                 #note-input {
-                    flex: 1;
+                    width: 100%;
+                    box-sizing: border-box;
                     background-color: var(--vscode-input-background);
                     color: var(--vscode-input-foreground);
                     border: 1px solid var(--vscode-input-border);
-                    padding: 4px;
+                    border-radius: 4px;
+                    padding: 8px 30px 8px 8px; /* Right padding for button */
+                    resize: none;
+                    min-height: 32px;
+                    height: 32px; /* Start single line-ish */
+                    font-family: inherit;
+                    outline: none;
+                    overflow: hidden; /* Hide scrollbar */
                 }
-                button {
-                    background-color: var(--vscode-button-background);
-                    color: var(--vscode-button-foreground);
+                #note-input:focus {
+                    border-color: var(--vscode-focusBorder);
+                }
+                #add-btn {
+                    position: absolute;
+                    right: 6px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    background: none;
                     border: none;
-                    padding: 4px 8px;
+                    color: var(--vscode-icon-foreground);
                     cursor: pointer;
+                    padding: 2px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
                 }
-                button:hover {
-                    background-color: var(--vscode-button-hoverBackground);
-                }
-                .dragging {
-                    opacity: 0.5;
+                #add-btn:hover {
+                    color: var(--vscode-textLink-activeForeground);
                 }
             </style>
         </head>
@@ -248,8 +278,10 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
             <div id="footer">
                 <div id="token-display">Total Tokens: 0</div>
                 <div id="input-area">
-                    <input type="text" id="note-input" placeholder="Add a note..." />
-                    <button id="add-btn">Add</button>
+                    <textarea id="note-input" placeholder="Add context..."></textarea>
+                    <button id="add-btn" title="Add Note">
+                        <svg width="14" height="14" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M1.5 8a.5.5 0 0 1 .5-.5h10.793L9.146 3.854a.5.5 0 1 1 .708-.708l4.5 4.5a.5.5 0 0 1 0 .708l-4.5 4.5a.5.5 0 0 1-.708-.708L12.793 8.5H2a.5.5 0 0 1-.5-.5z"/></svg>
+                    </button>
                 </div>
             </div>
 
@@ -273,16 +305,24 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     }
                 });
 
+                // Auto-resize textarea
+                noteInput.addEventListener('input', function() {
+                    this.style.height = '32px';
+                    this.style.height = (this.scrollHeight) + 'px';
+                });
+
                 // Add Note
                 addBtn.addEventListener('click', () => {
                     const text = noteInput.value.trim();
                     if (text) {
                         vscode.postMessage({ type: 'add-note', text: text });
                         noteInput.value = '';
+                        noteInput.style.height = '32px';
                     }
                 });
-                noteInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
+                noteInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
                         addBtn.click();
                     }
                 });
@@ -295,9 +335,19 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     items.forEach(item => {
                         const el = document.createElement('div');
                         el.className = 'item';
-                        el.draggable = true;
                         el.dataset.id = item.id;
 
+                        // Icon (Restored)
+                        const icon = document.createElement('div');
+                        icon.className = 'item-icon';
+                        if (item.type === 'file') {
+                            icon.innerHTML = \`<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M13.71 4.29l-3-3L10 1H4L3 2v12l1 1h9l1-1V5l-.29-.71zM13 14H4V2h5v4h4v8z"/></svg>\`;
+                        } else {
+                            icon.innerHTML = \`<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M2.5 1h11a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 13.5v-11A1.5 1.5 0 0 1 2.5 1zm11 1.5h-11v11h11v-11zM4 4h8v1H4V4zm0 3h8v1H4V7zm0 3h5v1H4v-1z"/></svg>\`;
+                        }
+                        el.appendChild(icon);
+
+                        // Content
                         const content = document.createElement('div');
                         content.className = 'item-content';
                         if (item.type === 'file') {
@@ -306,44 +356,32 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                                 content.textContent += \` :\${item.range.start + 1}-\${item.range.end + 1}\`;
                             }
                             content.title = item.content;
-                            content.onclick = () => {
+                            el.onclick = () => {
                                 vscode.postMessage({ type: 'open-file', path: item.content, range: item.range });
                             };
                         } else {
                             content.textContent = item.content;
                             content.title = item.content;
                         }
+                        el.appendChild(content);
                         
+                        // Actions
                         const actions = document.createElement('div');
                         actions.className = 'item-actions';
                         const delBtn = document.createElement('button');
                         delBtn.className = 'icon-btn';
-                        delBtn.innerHTML = '🗑️';
+                        // Cross icon (VS Code style 'close')
+                        delBtn.innerHTML = \`<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M8 7.293l4.146-4.147.708.708L8.707 8l4.147 4.146-.708.708L8 8.707l-4.146 4.147-.708-.708L7.293 8 3.146 3.854l.708-.708L8 7.293z"/></svg>\`;
+                        delBtn.title = 'Remove Item';
                         delBtn.onclick = (e) => {
                             e.stopPropagation();
                             vscode.postMessage({ type: 'delete-item', id: item.id });
                         };
                         actions.appendChild(delBtn);
-
-                        el.appendChild(content);
                         el.appendChild(actions);
-
-                        // Drag Events
-                        el.addEventListener('dragstart', () => {
-                            el.classList.add('dragging');
-                        });
-                        el.addEventListener('dragend', () => {
-                            el.classList.remove('dragging');
-                            updateOrder();
-                        });
 
                         list.appendChild(el);
 
-                        // Token Calc (Simple heuristic)
-                        // In a real app, extension should calculate and send tokens.
-                        // For now, let's assume extension sends it or we estimate.
-                        // The extension code I wrote sends 'tokens' property for notes, but maybe not files yet.
-                        // Let's rely on extension sending it in future updates, or estimate here.
                         if (item.tokens) {
                             totalTokens += item.tokens;
                         } else {
@@ -353,37 +391,6 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     });
 
                     tokenDisplay.textContent = \`Total Tokens: \${totalTokens}\`;
-                }
-
-                // Drag Over Logic
-                list.addEventListener('dragover', e => {
-                    e.preventDefault();
-                    const afterElement = getDragAfterElement(list, e.clientY);
-                    const draggable = document.querySelector('.dragging');
-                    if (afterElement == null) {
-                        list.appendChild(draggable);
-                    } else {
-                        list.insertBefore(draggable, afterElement);
-                    }
-                });
-
-                function getDragAfterElement(container, y) {
-                    const draggableElements = [...container.querySelectorAll('.item:not(.dragging)')];
-
-                    return draggableElements.reduce((closest, child) => {
-                        const box = child.getBoundingClientRect();
-                        const offset = y - box.top - box.height / 2;
-                        if (offset < 0 && offset > closest.offset) {
-                            return { offset: offset, element: child };
-                        } else {
-                            return closest;
-                        }
-                    }, { offset: Number.NEGATIVE_INFINITY }).element;
-                }
-
-                function updateOrder() {
-                    const newOrderIds = [...list.querySelectorAll('.item')].map(el => el.dataset.id);
-                    vscode.postMessage({ type: 'reorder-items', items: newOrderIds });
                 }
             </script>
         </body>

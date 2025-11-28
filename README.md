@@ -15,8 +15,10 @@ A dedicated sidebar view in the Activity Bar lets you manage your gathered conte
 - **Add Notes**: Type directly into the chatbox at the bottom of the sidebar to add text notes or instructions to your context.
 - **Mix & Match**: Combine files and text notes in a single list.
 
-### 🔄 Drag & Drop Reordering
-- **Organize**: Drag items up and down to reorder them. The order in the list determines the order in the copied output.
+### 🔄 Context Management
+- **Clean Interface**: A polished, native VS Code style list.
+- **Icons**: Clear distinction between files and notes.
+
 
 ### 📊 Token Calculator
 - **Real-Time Count**: See the estimated total token count of your context at the bottom of the sidebar.
@@ -37,8 +39,7 @@ A dedicated sidebar view in the Activity Bar lets you manage your gathered conte
 
 1.  **Gather**: Right-click files or selections and choose **Add to Context**.
 2.  **Annotate**: Use the chatbox to add custom instructions.
-3.  **Organize**: Drag items to arrange them logically.
-4.  **Export**: Click the **Copy** icon and paste it where you need it!
+3.  **Export**: Click the **Copy** icon and paste it where you need it!
 
 ## License
 
@@ -49,7 +50,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### 0.0.3
 - **New UI**: Migrated to a custom Webview for a better experience.
 - **Chatbox**: Added ability to add text notes.
-- **Drag & Drop**: Added support for reordering items.
+### 0.0.4
+- **UI Polish**: Updated to match native VS Code style (compact list, hover effects).
+- **Accurate Tokens**: Integrated `js-tiktoken` (GPT-4 tokenizer) for precise token counting.
+- **Enhanced Chatbox**: Rounded UI, embedded send button, and auto-expanding input.
+- **Icons**: Updated to monochrome SVGs that adapt to your theme.
+- **UX Improvements**: Removed drag-and-drop for simplicity, restored Copy/Clear buttons to title bar.
+
+### 0.0.3
+- **New UI**: Migrated to a custom Webview for a better experience.
+- **Chatbox**: Added ability to add text notes.
 - **Token Calculator**: Added real-time token estimation.
 
 ### 0.0.2
