@@ -105,6 +105,16 @@
           "group": "context-hopper@1"
         }
       ]
+    },
+    "configuration": {
+      "title": "Context Hopper",
+      "properties": {
+        "contextHopper.redactSecrets": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically redact potential secrets (API keys, passwords) from copied context."
+        }
+      }
     }
   },
   "scripts": {

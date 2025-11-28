@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { encodingForModel } from 'js-tiktoken';
+import { scrubSecrets } from './utils/secretScrubber';
 
 export interface ContextItem {
     id: string;
@@ -136,8 +137,23 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                 content += `\n// Note:\n${item.content}\n`;
             }
         }
-        await vscode.env.clipboard.writeText(content);
-        vscode.window.showInformationMessage(`Copied ${this._items.length} items to clipboard.`);
+
+        // Secret Scrubbing
+        const config = vscode.workspace.getConfiguration('contextHopper');
+        const redactSecrets = config.get<boolean>('redactSecrets', true);
+        let finalContent = content;
+        let redactedMsg = '';
+
+        if (redactSecrets) {
+            const result = scrubSecrets(content);
+            finalContent = result.cleanText;
+            if (result.redactedCount > 0) {
+                redactedMsg = ` (Redacted ${result.redactedCount} secrets)`;
+            }
+        }
+
+        await vscode.env.clipboard.writeText(finalContent);
+        vscode.window.showInformationMessage(`Copied ${this._items.length} items to clipboard.${redactedMsg}`);
     }
 
     public clearAll() {
