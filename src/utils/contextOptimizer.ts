@@ -10,10 +10,11 @@ export function optimizeCode(code: string, languageId: string, options: Optimiza
     // 1. Remove Comments
     if (options.removeComments) {
         // Safe Regex for C-style comments (// and /* */)
-        // Note: This is a simplified regex as requested. For production-grade comment removal, 
-        // a parser or more complex regex is usually needed to handle strings correctly.
-        // However, we are sticking to the user's requested logic for now.
-        output = output.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1');
+        // We use a callback to avoid potential issues with $1 replacement if groups are undefined
+        output = output.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, (match, p1) => {
+            if (p1 !== undefined) return p1; // Line comment, keep preceding char
+            return ''; // Block comment, remove
+        });
     }
 
     // 2. Remove Empty Lines (The "Safe" Compact)
