@@ -50,19 +50,20 @@ export function activate(context: vscode.ExtensionContext) {
                 }
                 // Accurate token count using js-tiktoken
                 tokens = enc.encode(text).length;
+
+                const item: ContextItem = {
+                    id: Date.now().toString(),
+                    type: 'file',
+                    content: uri.fsPath,
+                    label: path.basename(uri.fsPath),
+                    languageId: doc.languageId,
+                    range: range ? { start: range.start.line, end: range.end.line } : undefined,
+                    tokens: tokens
+                };
+                contextWebviewProvider.addItem(item);
             } catch (e) {
                 console.error('Error reading file for token calculation:', e);
             }
-
-            const item: ContextItem = {
-                id: Date.now().toString(),
-                type: 'file',
-                content: uri.fsPath,
-                label: path.basename(uri.fsPath),
-                range: range ? { start: range.start.line, end: range.end.line } : undefined,
-                tokens: tokens
-            };
-            contextWebviewProvider.addItem(item);
         }
     });
 
@@ -97,37 +98,6 @@ export function activate(context: vscode.ExtensionContext) {
                 ...repo.state.mergeChanges
             ];
 
-            for (const change of changes) {
-                if (change.status === 6) { // Deleted
-                    continue;
-                }
-                
-                const uri = change.uri;
-                let tokens = 0;
-                try {
-                    const doc = await vscode.workspace.openTextDocument(uri);
-                    const text = doc.getText();
-                    tokens = enc.encode(text).length;
-                } catch (e) {
-                    console.log('Skipping deleted or inaccessible file:', uri.fsPath);
-                    continue;
-                }
-
-                const item: ContextItem = {
-                    id: Date.now().toString() + Math.random().toString(), // Ensure unique ID
-                    type: 'file',
-                    content: uri.fsPath,
-                    label: path.basename(uri.fsPath),
-                    tokens: tokens
-                };
-                contextWebviewProvider.addItem(item);
-                addedCount++;
-            }
-        }
-
-        if (addedCount > 0) {
-            vscode.window.showInformationMessage(`Added ${addedCount} changed files to context.`);
-        } else {
             vscode.window.showInformationMessage('No Git changes found.');
         }
     });
@@ -221,6 +191,15 @@ export function activate(context: vscode.ExtensionContext) {
         await vscode.env.clipboard.writeText(content);
         vscode.window.showInformationMessage(`Copied group "${group.name}" to clipboard.${redactedMsg}`);
     }));
+
+    // Handle Webview Messages (Optimization Menu)
+    // We need to expose a method in ContextWebviewProvider to trigger this or handle it via command
+    // Since message comes from webview, it's handled in provider. But provider needs to call VS Code UI.
+    // Let's add a command that the provider calls, or handle it inside provider.
+    // Provider has access to vscode.window.showQuickPick.
+    // Wait, ContextWebviewProvider is in a separate file. It can import vscode.
+    // So we can handle showQuickPick directly in ContextWebviewProvider.ts!
+    // I will update ContextWebviewProvider.ts instead of extension.ts for this logic to keep it encapsulated.
 }
 
 export function deactivate() {}
