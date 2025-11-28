@@ -43,6 +43,11 @@
         "command": "context-hopper.deleteItem",
         "title": "Delete Item",
         "icon": "$(trash)"
+      },
+      {
+        "command": "context-hopper.addGitChanges",
+        "title": "Add Git Changes",
+        "icon": "$(git-merge)"
       }
     ],
     "viewsContainers": {
@@ -72,6 +77,11 @@
         },
         {
           "command": "context-hopper.clear",
+          "when": "view == context-hopper-view",
+          "group": "navigation"
+        },
+        {
+          "command": "context-hopper.addGitChanges",
           "when": "view == context-hopper-view",
           "group": "navigation"
         }

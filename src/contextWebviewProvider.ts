@@ -63,15 +63,17 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     public addItem(item: ContextItem) {
-        // Check for duplicates if it's a file
-        if (item.type === 'file') {
-            const existing = this._items.find(i => i.type === 'file' && i.content === item.content && JSON.stringify(i.range) === JSON.stringify(item.range));
-            if (existing) {
-                return;
-            }
+        // Deduplication: Check if item with same content (path) already exists
+        const exists = this._items.some(existing => 
+            existing.type === 'file' && 
+            item.type === 'file' && 
+            existing.content === item.content
+        );
+
+        if (!exists) {
+            this._items.push(item);
+            this._updateWebview();
         }
-        this._items.push(item);
-        this._updateWebview();
     }
 
     private removeItem(id: string) {

@@ -47,9 +47,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Release Notes
 
-### 0.0.3
-- **New UI**: Migrated to a custom Webview for a better experience.
-- **Chatbox**: Added ability to add text notes.
 ### 0.0.4
 - **UI Polish**: Updated to match native VS Code style (compact list, hover effects).
 - **Accurate Tokens**: Integrated `js-tiktoken` (GPT-4 tokenizer) for precise token counting.
