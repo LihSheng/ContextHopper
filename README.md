@@ -47,6 +47,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Release Notes
 
+### 0.0.5
+- **Token Optimization 2.0**: Refined "Remove Empty Lines" logic (indentation-safe) and "Remove Comments" (safer regex).
+- **Native UI**: Updated footer with native VS Code icons (Gear for settings, Zap for active state).
+- **Bug Fixes**: Fixed an issue where enabling optimizations could increase token count.
+- **CI/CD**: Added automated publishing workflow.
+
 ### 0.0.4
 - **UI Polish**: Updated to match native VS Code style (compact list, hover effects).
 - **Accurate Tokens**: Integrated `js-tiktoken` (GPT-4 tokenizer) for precise token counting.
