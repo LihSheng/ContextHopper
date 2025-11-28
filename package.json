@@ -40,14 +40,34 @@
         "icon": "$(clear-all)"
       },
       {
-        "command": "context-hopper.deleteItem",
-        "title": "Delete Item",
+        "command": "context-hopper.saveContext",
+        "title": "Save Context Group",
+        "icon": "$(save)"
+      },
+      {
+        "command": "context-hopper.loadGroup",
+        "title": "Load Group",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "context-hopper.copyGroup",
+        "title": "Copy Group",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "context-hopper.deleteGroup",
+        "title": "Delete Group",
         "icon": "$(trash)"
       },
       {
-        "command": "context-hopper.addGitChanges",
-        "title": "Add Git Changes",
-        "icon": "$(git-merge)"
+        "command": "context-hopper.pinGroup",
+        "title": "Pin Group",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "context-hopper.unpinGroup",
+        "title": "Unpin Group",
+        "icon": "$(pinned)"
       }
     ],
     "viewsContainers": {
@@ -65,11 +85,20 @@
           "type": "webview",
           "id": "context-hopper-view",
           "name": "Context Items"
+        },
+        {
+          "id": "context-hopper-saved",
+          "name": "Saved Contexts"
         }
       ]
     },
     "menus": {
       "view/title": [
+        {
+          "command": "context-hopper.saveContext",
+          "when": "view == context-hopper-view",
+          "group": "navigation"
+        },
         {
           "command": "context-hopper.copyAll",
           "when": "view == context-hopper-view",
@@ -87,6 +116,31 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "context-hopper.loadGroup",
+          "when": "view == context-hopper-saved && (viewItem == savedGroup || viewItem == savedGroupPinned)",
+          "group": "inline"
+        },
+        {
+          "command": "context-hopper.copyGroup",
+          "when": "view == context-hopper-saved && (viewItem == savedGroup || viewItem == savedGroupPinned)",
+          "group": "inline"
+        },
+        {
+          "command": "context-hopper.pinGroup",
+          "when": "view == context-hopper-saved && viewItem == savedGroup",
+          "group": "inline"
+        },
+        {
+          "command": "context-hopper.unpinGroup",
+          "when": "view == context-hopper-saved && viewItem == savedGroupPinned",
+          "group": "inline"
+        },
+        {
+          "command": "context-hopper.deleteGroup",
+          "when": "view == context-hopper-saved && (viewItem == savedGroup || viewItem == savedGroupPinned)",
+          "group": "inline"
+        },
         {
           "command": "context-hopper.deleteItem",
           "when": "view == context-hopper-view",

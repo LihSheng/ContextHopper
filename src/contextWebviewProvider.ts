@@ -161,6 +161,15 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
         this._updateWebview();
     }
 
+    public getItems(): ContextItem[] {
+        return this._items;
+    }
+
+    public loadItems(items: ContextItem[]) {
+        this._items = items;
+        this._updateWebview();
+    }
+
     private _updateWebview() {
         if (this._view) {
             this._view.webview.postMessage({ type: 'update-items', items: this._items });

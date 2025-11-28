@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { encodingForModel } from 'js-tiktoken';
 import { ContextWebviewProvider, ContextItem } from './contextWebviewProvider';
+import { SavedContextTreeProvider, SavedGroup } from './savedContextTreeProvider';
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Congratulations, your extension "context-hopper" is now active!');
@@ -136,6 +137,90 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(copyAllDisposable);
     context.subscriptions.push(clearDisposable);
     context.subscriptions.push(addGitChangesDisposable);
+
+    // Saved Contexts
+    const savedContextTreeProvider = new SavedContextTreeProvider(context);
+    vscode.window.registerTreeDataProvider('context-hopper-saved', savedContextTreeProvider);
+
+    context.subscriptions.push(vscode.commands.registerCommand('context-hopper.saveContext', async () => {
+        const items = contextWebviewProvider.getItems();
+        if (items.length === 0) {
+            vscode.window.showInformationMessage('Context list is empty.');
+            return;
+        }
+        const name = await vscode.window.showInputBox({ prompt: 'Enter a name for this context group' });
+        if (name) {
+            await savedContextTreeProvider.saveGroup(name, items);
+            vscode.window.showInformationMessage(`Saved group "${name}".`);
+        }
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('context-hopper.loadGroup', (group: SavedGroup) => {
+        contextWebviewProvider.loadItems(group.items);
+        vscode.window.showInformationMessage(`Loaded group "${group.name}".`);
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('context-hopper.deleteGroup', async (group: SavedGroup) => {
+        const confirm = await vscode.window.showWarningMessage(`Delete group "${group.name}"?`, 'Yes', 'No');
+        if (confirm === 'Yes') {
+            await savedContextTreeProvider.deleteGroup(group);
+        }
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('context-hopper.pinGroup', async (group: SavedGroup) => {
+        await savedContextTreeProvider.togglePin(group);
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('context-hopper.unpinGroup', async (group: SavedGroup) => {
+        await savedContextTreeProvider.togglePin(group);
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('context-hopper.copyGroup', async (group: SavedGroup) => {
+        // Re-use logic from WebviewProvider? Or duplicate? 
+        // Duplicating slightly modified logic to avoid tight coupling or complex passing
+        // Ideally we refactor 'copy logic' to a shared util, but for now:
+        
+        let content = '';
+        const config = vscode.workspace.getConfiguration('contextHopper');
+        const redactSecrets = config.get<boolean>('redactSecrets', true);
+
+        for (const item of group.items) {
+             if (item.type === 'file') {
+                try {
+                    const uri = vscode.Uri.file(item.content);
+                    const doc = await vscode.workspace.openTextDocument(uri);
+                    content += `\n// File: ${path.basename(item.content)}\n`;
+                    content += `// Path: ${item.content}\n`;
+                    if (item.range) {
+                        content += `// Lines: ${item.range.start + 1}-${item.range.end + 1}\n`;
+                        const range = new vscode.Range(item.range.start, 0, item.range.end, 1000); 
+                        content += doc.getText(range) + '\n';
+                    } else {
+                        content += doc.getText() + '\n';
+                    }
+                } catch (e) {
+                    content += `\n// Error reading file: ${item.content}\n`;
+                }
+            } else if (item.type === 'text') {
+                content += `\n// Note:\n${item.content}\n`;
+            }
+        }
+
+        let redactedMsg = '';
+        if (redactSecrets) {
+             // Need to import scrubSecrets here too or move to util
+             // Assuming scrubSecrets is exported from util
+             const { scrubSecrets } = require('./utils/secretScrubber');
+             const result = scrubSecrets(content);
+             content = result.cleanText;
+             if (result.redactedCount > 0) {
+                 redactedMsg = ` (Redacted ${result.redactedCount} secrets)`;
+             }
+        }
+
+        await vscode.env.clipboard.writeText(content);
+        vscode.window.showInformationMessage(`Copied group "${group.name}" to clipboard.${redactedMsg}`);
+    }));
 }
 
 export function deactivate() {}
