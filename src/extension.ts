@@ -10,7 +10,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Initialize tokenizer
     const enc = encodingForModel('gpt-4');
 
-	const contextWebviewProvider = new ContextWebviewProvider(context.extensionUri);
+	const contextWebviewProvider = new ContextWebviewProvider(context.extensionUri, context);
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(ContextWebviewProvider.viewType, contextWebviewProvider)
 	);
@@ -18,6 +18,35 @@ export function activate(context: vscode.ExtensionContext) {
 	let disposable = vscode.commands.registerCommand('context-hopper.helloWorld', () => {
 		vscode.window.showInformationMessage('Hello World from Context Hopper!');
 	});
+
+    // Helper to add a single file
+    const addFileToContext = async (uri: vscode.Uri, range?: vscode.Range) => {
+        let tokens = 0;
+        try {
+            const doc = await vscode.workspace.openTextDocument(uri);
+            let text = '';
+            if (range) {
+                text = doc.getText(range);
+            } else {
+                text = doc.getText();
+            }
+            // Accurate token count using js-tiktoken
+            tokens = enc.encode(text).length;
+
+            const item: ContextItem = {
+                id: Date.now().toString() + Math.random().toString().slice(2), // Unique ID
+                type: 'file',
+                content: uri.fsPath,
+                label: path.basename(uri.fsPath),
+                languageId: doc.languageId,
+                range: range ? { start: range.start.line, end: range.end.line } : undefined,
+                tokens: tokens
+            };
+            contextWebviewProvider.addItem(item);
+        } catch (e) {
+            console.error('Error reading file for token calculation:', e);
+        }
+    };
 
     let addItemDisposable = vscode.commands.registerCommand('context-hopper.addItem', async (uri: vscode.Uri) => {
         let range: vscode.Range | undefined;
@@ -39,30 +68,35 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         if (uri) {
-            let tokens = 0;
             try {
-                const doc = await vscode.workspace.openTextDocument(uri);
-                let text = '';
-                if (range) {
-                    text = doc.getText(range);
-                } else {
-                    text = doc.getText();
-                }
-                // Accurate token count using js-tiktoken
-                tokens = enc.encode(text).length;
+                const stat = await vscode.workspace.fs.stat(uri);
+                if (stat.type === vscode.FileType.Directory) {
+                    // It's a folder, add all files recursively
+                    const pattern = new vscode.RelativePattern(uri, '**/*');
+                    // Exclude node_modules and .git
+                    const exclude = '**/{node_modules,.git}/**';
+                    const files = await vscode.workspace.findFiles(pattern, exclude);
 
-                const item: ContextItem = {
-                    id: Date.now().toString(),
-                    type: 'file',
-                    content: uri.fsPath,
-                    label: path.basename(uri.fsPath),
-                    languageId: doc.languageId,
-                    range: range ? { start: range.start.line, end: range.end.line } : undefined,
-                    tokens: tokens
-                };
-                contextWebviewProvider.addItem(item);
+                    vscode.window.withProgress({
+                        location: vscode.ProgressLocation.Notification,
+                        title: `Adding ${files.length} files from ${path.basename(uri.fsPath)}...`,
+                        cancellable: true
+                    }, async (progress, token) => {
+                        let count = 0;
+                        for (const file of files) {
+                            if (token.isCancellationRequested) break;
+                            await addFileToContext(file);
+                            count++;
+                            progress.report({ increment: (1 / files.length) * 100, message: `${count}/${files.length}` });
+                        }
+                    });
+                } else {
+                    // It's a file
+                    await addFileToContext(uri, range);
+                }
             } catch (e) {
-                console.error('Error reading file for token calculation:', e);
+                console.error('Error adding item:', e);
+                vscode.window.showErrorMessage('Failed to add item to context.');
             }
         }
     });
