@@ -47,6 +47,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Release Notes
 
+### 0.0.9
+- **Multi-Select**: Added support for selecting multiple items using `Ctrl/Cmd` + Click or `Shift` + Click.
+- **Batch Actions**: Added "Copy Selected" and "Delete Selected" buttons for batch operations.
+- **Bug Fix**: Fixed a critical bug where adding items to the active context would also modify saved context groups.
+
 ### 0.0.8
 - **Folder Support**: Added ability to add entire folders to context (recursively adds all files).
 

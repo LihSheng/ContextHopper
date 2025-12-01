@@ -84,7 +84,7 @@ export class SavedContextTreeProvider implements vscode.TreeDataProvider<SavedGr
         const newGroup: SavedGroup = {
             id: Date.now().toString(),
             name,
-            items,
+            items: JSON.parse(JSON.stringify(items)),
             pinned: false,
             totalTokens,
             createdAt: Date.now()
