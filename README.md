@@ -47,6 +47,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Release Notes
 
+### 0.0.8
+- **Folder Support**: Added ability to add entire folders to context (recursively adds all files).
+
+### 0.0.7
+- **View Sync Fix**: Fixed an issue where the context list wouldn't update when switching back from other views.
+
+### 0.0.6
+- **Persistence**: Context items are now saved and restored across sessions.
+- **Initial Load Fix**: Fixed a bug where items weren't visible immediately on startup.
+
 ### 0.0.5
 - **Token Optimization 2.0**: Refined "Remove Empty Lines" logic (indentation-safe) and "Remove Comments" (safer regex).
 - **Native UI**: Updated footer with native VS Code icons (Gear for settings, Zap for active state).

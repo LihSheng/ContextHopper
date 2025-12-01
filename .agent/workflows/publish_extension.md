@@ -25,3 +25,18 @@ This workflow automatically publishes the extension to the VS Code Marketplace w
 ## Note
 
 Ensure you update the `version` in `package.json` before pushing to `main`, otherwise the publish step will fail if the version already exists.
+
+## Manual Publishing (CLI)
+
+If you prefer to publish manually from your local machine:
+
+1.  **Install vsce**: `npm install -g @vscode/vsce` (or use `npx`)
+2.  **Login**: `vsce login <publisher id>`
+    - You will be prompted for your PAT.
+3.  **Publish**: `vsce publish`
+    - Or with a specific token: `vsce publish -p <token>`
+
+**Troubleshooting 401 Unauthorized**:
+- **Check Token Scopes**: Ensure your PAT has `Marketplace > Manage` scope.
+- **Check Expiration**: PATs expire; you may need to regenerate it.
+- **Check Organization**: Ensure the PAT is created in the correct Azure DevOps organization associated with your publisher.

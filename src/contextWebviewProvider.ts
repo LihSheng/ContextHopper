@@ -27,7 +27,14 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
-    ) { }
+        private readonly _context: vscode.ExtensionContext
+    ) {
+        // Load persisted items
+        const savedItems = this._context.workspaceState.get<ContextItem[]>('context-hopper-items');
+        if (savedItems) {
+            this._items = savedItems;
+        }
+    }
 
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
@@ -45,10 +52,18 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
 
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-        // Send initial settings
+        // Send initial settings and items
         setTimeout(() => {
              webviewView.webview.postMessage({ type: 'update-optimization-settings', settings: this._optimizationSettings });
+             this._updateWebview();
         }, 500);
+
+        // Sync when view becomes visible
+        webviewView.onDidChangeVisibility(() => {
+            if (webviewView.visible) {
+                this._updateWebview();
+            }
+        });
 
         webviewView.webview.onDidReceiveMessage(data => {
             switch (data.type) {
@@ -90,12 +105,14 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
 
         if (!exists) {
             this._items.push(item);
+            this._saveState();
             this._updateWebview();
         }
     }
 
     private removeItem(id: string) {
         this._items = this._items.filter(x => x.id !== id);
+        this._saveState();
         this._updateWebview();
     }
 
@@ -108,6 +125,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
             }
         }
         this._items = newItems;
+        this._saveState();
         this._updateWebview(); // Optional, mainly to sync state if needed
     }
 
@@ -119,6 +137,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
             tokens: this._enc.encode(text).length
         };
         this._items.push(item);
+        this._saveState();
         this._updateWebview();
     }
 
@@ -261,6 +280,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
 
     public clearAll() {
         this._items = [];
+        this._saveState();
         this._updateWebview();
     }
 
@@ -270,6 +290,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
 
     public loadItems(items: ContextItem[]) {
         this._items = items;
+        this._saveState();
         this._updateWebview();
     }
 
@@ -277,6 +298,10 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
         if (this._view) {
             this._view.webview.postMessage({ type: 'update-items', items: this._items });
         }
+    }
+
+    private _saveState() {
+        this._context.workspaceState.update('context-hopper-items', this._items);
     }
 
     private _getHtmlForWebview(webview: vscode.Webview) {
