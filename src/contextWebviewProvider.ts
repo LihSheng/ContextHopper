@@ -70,6 +70,9 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                 case 'delete-item':
                     this.removeItem(data.id);
                     break;
+                case 'delete-items':
+                    this.removeItems(data.ids);
+                    break;
                 case 'reorder-items':
                     this.reorderItems(data.items);
                     break;
@@ -81,6 +84,9 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     break;
                 case 'copy-all':
                     this.copyAll();
+                    break;
+                case 'copy-items':
+                    this.copyItems(data.ids);
                     break;
                 case 'clear-all':
                     this.clearAll();
@@ -112,6 +118,12 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
 
     private removeItem(id: string) {
         this._items = this._items.filter(x => x.id !== id);
+        this._saveState();
+        this._updateWebview();
+    }
+
+    private removeItems(ids: string[]) {
+        this._items = this._items.filter(x => !ids.includes(x.id));
         this._saveState();
         this._updateWebview();
     }
@@ -278,6 +290,63 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
         vscode.window.showInformationMessage(`Copied ${this._items.length} items to clipboard.${redactedMsg}`);
     }
 
+    public async copyItems(ids: string[]) {
+        const itemsToCopy = this._items.filter(x => ids.includes(x.id));
+        if (itemsToCopy.length === 0) return;
+
+        let content = '';
+        for (const item of itemsToCopy) {
+            if (item.type === 'file') {
+                try {
+                    const uri = vscode.Uri.file(item.content);
+                    const doc = await vscode.workspace.openTextDocument(uri);
+                    let fileContent = '';
+                    
+                    content += `\n// File: ${path.basename(item.content)}\n`;
+                    content += `// Path: ${item.content}\n`;
+                    
+                    if (item.range) {
+                        content += `// Lines: ${item.range.start + 1}-${item.range.end + 1}\n`;
+                        const range = new vscode.Range(item.range.start, 0, item.range.end, 1000); 
+                        fileContent = doc.getText(range);
+                    } else {
+                        fileContent = doc.getText();
+                    }
+
+                    // Optimize
+                    fileContent = optimizeCode(fileContent, item.languageId || 'plaintext', this._optimizationSettings);
+                    content += fileContent + '\n';
+
+                } catch (e) {
+                    content += `\n// Error reading file: ${item.content}\n`;
+                }
+            } else if (item.type === 'text') {
+                let noteContent = item.content;
+                if (this._optimizationSettings.removeEmptyLines) {
+                     noteContent = noteContent.replace(/^\s*[\r\n]/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+                }
+                content += `\n// Note:\n${noteContent}\n`;
+            }
+        }
+
+        // Secret Scrubbing
+        const config = vscode.workspace.getConfiguration('contextHopper');
+        const redactSecrets = config.get<boolean>('redactSecrets', true);
+        let finalContent = content;
+        let redactedMsg = '';
+
+        if (redactSecrets) {
+            const result = scrubSecrets(content);
+            finalContent = result.cleanText;
+            if (result.redactedCount > 0) {
+                redactedMsg = ` (Redacted ${result.redactedCount} secrets)`;
+            }
+        }
+
+        await vscode.env.clipboard.writeText(finalContent);
+        vscode.window.showInformationMessage(`Copied ${itemsToCopy.length} items to clipboard.${redactedMsg}`);
+    }
+
     public clearAll() {
         this._items = [];
         this._saveState();
@@ -342,6 +411,13 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     background-color: var(--vscode-list-hoverBackground);
                     color: var(--vscode-list-hoverForeground);
                 }
+                .item.selected {
+                    background-color: var(--vscode-list-activeSelectionBackground);
+                    color: var(--vscode-list-activeSelectionForeground);
+                }
+                .item.selected:hover {
+                    background-color: var(--vscode-list-activeSelectionBackground);
+                }
                 .item-icon {
                     margin-right: 6px;
                     display: flex;
@@ -381,6 +457,34 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     padding: 10px;
                     border-top: 1px solid var(--vscode-panel-border);
                     background-color: var(--vscode-sideBar-background);
+                }
+                #batch-actions {
+                    display: none;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 4px 10px;
+                    background-color: var(--vscode-editor-background);
+                    border-bottom: 1px solid var(--vscode-panel-border);
+                    font-size: 12px;
+                }
+                .batch-btn {
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    color: var(--vscode-button-foreground);
+                    background-color: var(--vscode-button-background);
+                    padding: 2px 8px;
+                    border-radius: 2px;
+                }
+                .batch-btn:hover {
+                    background-color: var(--vscode-button-hoverBackground);
+                }
+                .batch-btn.secondary {
+                    background-color: var(--vscode-button-secondaryBackground);
+                    color: var(--vscode-button-secondaryForeground);
+                }
+                .batch-btn.secondary:hover {
+                    background-color: var(--vscode-button-secondaryHoverBackground);
                 }
                 #footer-content {
                     display: flex;
@@ -444,6 +548,13 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
             </style>
         </head>
         <body>
+            <div id="batch-actions">
+                <span id="selection-count">0 selected</span>
+                <div style="display: flex; gap: 5px;">
+                    <button id="batch-copy-btn" class="batch-btn secondary" title="Copy Selected">Copy</button>
+                    <button id="batch-delete-btn" class="batch-btn" title="Delete Selected">Delete</button>
+                </div>
+            </div>
             <div id="list"></div>
             <div id="footer">
                 <div id="footer-content">
@@ -473,6 +584,13 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                 const noteInput = document.getElementById('note-input');
                 const addBtn = document.getElementById('add-btn');
                 const settingsBtn = document.getElementById('settings-btn');
+                const batchActions = document.getElementById('batch-actions');
+                const selectionCount = document.getElementById('selection-count');
+                const batchCopyBtn = document.getElementById('batch-copy-btn');
+                const batchDeleteBtn = document.getElementById('batch-delete-btn');
+
+                let selectedIds = new Set();
+                let lastSelectedId = null;
 
                 // Settings Handlers
                 settingsBtn.addEventListener('click', () => {
@@ -488,6 +606,10 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     switch (message.type) {
                         case 'update-items':
                             items = message.items;
+                            // Clean up selectedIds if items were removed
+                            const currentIds = new Set(items.map(i => i.id));
+                            selectedIds = new Set([...selectedIds].filter(id => currentIds.has(id)));
+                            updateBatchActions();
                             render();
                             break;
                         case 'update-optimization-settings':
@@ -525,6 +647,33 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     }
                 });
 
+                // Batch Actions
+                function updateBatchActions() {
+                    if (selectedIds.size > 0) {
+                        batchActions.style.display = 'flex';
+                        selectionCount.textContent = \`\${selectedIds.size} selected\`;
+                    } else {
+                        batchActions.style.display = 'none';
+                    }
+                }
+
+                batchCopyBtn.addEventListener('click', () => {
+                    vscode.postMessage({ type: 'copy-items', ids: Array.from(selectedIds) });
+                    selectedIds.clear();
+                    updateBatchActions();
+                    render();
+                });
+
+                batchDeleteBtn.addEventListener('click', () => {
+                    vscode.postMessage({ type: 'delete-items', ids: Array.from(selectedIds) });
+                    // Optimistic update
+                    // items = items.filter(i => !selectedIds.has(i.id));
+                    // selectedIds.clear();
+                    // updateBatchActions();
+                    // render();
+                    // Actually, let's wait for update-items from extension to be safe
+                });
+
                 // Render List
                 function render() {
                     list.innerHTML = '';
@@ -533,7 +682,39 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     items.forEach(item => {
                         const el = document.createElement('div');
                         el.className = 'item';
+                        if (selectedIds.has(item.id)) {
+                            el.classList.add('selected');
+                        }
                         el.dataset.id = item.id;
+
+                        // Click Handler for Selection
+                        el.onclick = (e) => {
+                            if (e.ctrlKey || e.metaKey) {
+                                // Toggle
+                                if (selectedIds.has(item.id)) {
+                                    selectedIds.delete(item.id);
+                                } else {
+                                    selectedIds.add(item.id);
+                                    lastSelectedId = item.id;
+                                }
+                            } else if (e.shiftKey && lastSelectedId) {
+                                // Range
+                                const lastIdx = items.findIndex(i => i.id === lastSelectedId);
+                                const currIdx = items.findIndex(i => i.id === item.id);
+                                const start = Math.min(lastIdx, currIdx);
+                                const end = Math.max(lastIdx, currIdx);
+                                for (let i = start; i <= end; i++) {
+                                    selectedIds.add(items[i].id);
+                                }
+                            } else {
+                                // Single Select (unless clicking action)
+                                selectedIds.clear();
+                                selectedIds.add(item.id);
+                                lastSelectedId = item.id;
+                            }
+                            updateBatchActions();
+                            render();
+                        };
 
                         // Icon (Restored)
                         const icon = document.createElement('div');
@@ -554,7 +735,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                                 content.textContent += \` :\${item.range.start + 1}-\${item.range.end + 1}\`;
                             }
                             content.title = item.content;
-                            el.onclick = () => {
+                            el.ondblclick = () => {
                                 vscode.postMessage({ type: 'open-file', path: item.content, range: item.range });
                             };
                         } else {
