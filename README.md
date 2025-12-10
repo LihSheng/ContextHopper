@@ -19,7 +19,6 @@ A dedicated sidebar view in the Activity Bar lets you manage your gathered conte
 - **Clean Interface**: A polished, native VS Code style list.
 - **Icons**: Clear distinction between files and notes.
 
-
 ### 📊 Token Calculator
 - **Real-Time Count**: See the estimated total token count of your context at the bottom of the sidebar.
 

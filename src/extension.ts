@@ -141,6 +141,13 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(copyAllDisposable);
     context.subscriptions.push(clearDisposable);
     context.subscriptions.push(addGitChangesDisposable);
+    context.subscriptions.push(vscode.commands.registerCommand('context-hopper.addFileStructure', () => {
+        contextWebviewProvider.addFileStructure();
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('context-hopper.addFolderStructure', (uri: vscode.Uri) => {
+        contextWebviewProvider.addFolderStructure(uri);
+    }));
 
     // Saved Contexts
     const savedContextTreeProvider = new SavedContextTreeProvider(context);

@@ -73,6 +73,16 @@
         "command": "context-hopper.addGitChanges",
         "title": "Add Git Changes",
         "icon": "$(git-merge)"
+      },
+      {
+        "command": "context-hopper.addFileStructure",
+        "title": "Add File Structure",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "context-hopper.addFolderStructure",
+        "title": "Add Folder Structure",
+        "icon": "$(list-tree)"
       }
     ],
     "viewsContainers": {
@@ -120,6 +130,11 @@
           "command": "context-hopper.addGitChanges",
           "when": "view == context-hopper-view",
           "group": "navigation"
+        },
+        {
+          "command": "context-hopper.addFileStructure",
+          "when": "view == context-hopper-view",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
@@ -159,6 +174,11 @@
         {
           "command": "context-hopper.addItem",
           "group": "context-hopper@1"
+        },
+        {
+          "command": "context-hopper.addFolderStructure",
+          "when": "explorerResourceIsFolder",
+          "group": "context-hopper@2"
         }
       ]
     },

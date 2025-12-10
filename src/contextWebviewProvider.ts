@@ -347,6 +347,125 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
         vscode.window.showInformationMessage(`Copied ${itemsToCopy.length} items to clipboard.${redactedMsg}`);
     }
 
+    public addFileStructure() {
+        const fileItems = this._items.filter(item => item.type === 'file');
+        if (fileItems.length === 0) {
+            vscode.window.showInformationMessage('No file items to generate structure from.');
+            return;
+        }
+
+        const filePaths = fileItems.map(item => item.content);
+        const tree = this._generateTree(filePaths);
+        
+        this.addNote(`File Structure (Context Items):\n\n${tree}`);
+        vscode.window.showInformationMessage('Added context file structure.');
+    }
+
+    public async addFolderStructure(folderUri: vscode.Uri) {
+        if (!folderUri) {
+            return;
+        }
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: `Generating structure for ${path.basename(folderUri.fsPath)}...`,
+            cancellable: true
+        }, async (_progress, token) => {
+             try {
+                // Find all files in the folder, respecting gitignore
+                const pattern = new vscode.RelativePattern(folderUri, '**/*');
+                const exclude = '**/{node_modules,.git,dist,out,build}/**';
+                const files = await vscode.workspace.findFiles(pattern, exclude);
+                
+                if (token.isCancellationRequested) return;
+
+                if (files.length === 0) {
+                    vscode.window.showInformationMessage('No files found in folder.');
+                    return;
+                }
+
+                const filePaths = files.map(f => f.fsPath);
+                // We generate the tree from the selected folder URI as root
+                const tree = this._generateTree(filePaths, folderUri.fsPath);
+                
+                this.addNote(`Folder Structure: ${path.basename(folderUri.fsPath)}\n\n${tree}`);
+                vscode.window.showInformationMessage('Added folder structure to context.');
+
+             } catch (e) {
+                 console.error(e);
+                 vscode.window.showErrorMessage('Failed to generate folder structure.');
+             }
+        });
+    }
+
+    private _generateTree(paths: string[], explicitRoot?: string): string {
+        const root: any = {};
+        
+        // Convert to string
+        // We need to find the common root to avoid showing full absolute paths if possible,
+        // or just show relative to workspace if they are in workspace.
+        // For simplicity, let's try to make them relative to the common ancestor.
+        
+        let commonAncestor = explicitRoot;
+        if (!commonAncestor) {
+             commonAncestor = this._getCommonAncestor(paths);
+        }
+
+        const relativePaths = paths.map(p => path.relative(commonAncestor!, p));
+        
+        const relativeRoot: any = {};
+        for (const p of relativePaths) {
+            const parts = p.split(path.sep);
+            let current = relativeRoot;
+            for (const part of parts) {
+                if (!current[part]) {
+                    current[part] = {};
+                }
+                current = current[part];
+            }
+        }
+
+        return `Root: ${commonAncestor}\n` + this._renderTree(relativeRoot);
+    }
+
+    private _getCommonAncestor(paths: string[]): string {
+        if (paths.length === 0) return '';
+        if (paths.length === 1) return path.dirname(paths[0]);
+        
+        const sep = path.sep;
+        const parts = paths.map(p => p.split(sep));
+        const minLength = Math.min(...parts.map(p => p.length));
+        let i = 0;
+        while (i < minLength) {
+            const val = parts[0][i];
+            if (parts.every(p => p[i] === val)) {
+                i++;
+            } else {
+                break;
+            }
+        }
+        return parts[0].slice(0, i).join(sep);
+    }
+
+    private _renderTree(node: any, prefix: string = ''): string {
+        let output = '';
+        const keys = Object.keys(node).sort();
+        
+        for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            const isLast = i === keys.length - 1;
+            const children = node[key];
+            const hasChildren = Object.keys(children).length > 0;
+            
+            output += `${prefix}${isLast ? '└── ' : '├── '}${key}\n`;
+            
+            if (hasChildren) {
+                output += this._renderTree(children, prefix + (isLast ? '    ' : '│   '));
+            }
+        }
+        return output;
+    }
+
     public clearAll() {
         this._items = [];
         this._saveState();
@@ -399,10 +518,10 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     padding: 0;
                 }
                 .item {
-                    padding: 0 10px;
-                    height: 22px;
+                    padding: 4px 10px;
+                    min-height: 22px;
                     display: flex;
-                    align-items: center;
+                    align-items: flex-start;
                     cursor: pointer;
                     color: var(--vscode-foreground);
                     user-select: none;
@@ -423,6 +542,8 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     display: flex;
                     align-items: center;
                     font-size: 14px;
+                    margin-top: 3px; /* Align with text top */
+                    flex-shrink: 0;
                 }
                 .item-content {
                     flex: 1;
@@ -431,6 +552,15 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     white-space: nowrap;
                     font-size: 13px;
                     line-height: 22px;
+                }
+                .item-content.text-mode {
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                    line-height: normal;
+                    font-family: var(--vscode-editor-font-family);
+                    padding-top: 2px;
+                    max-height: 400px;
+                    overflow: auto;
                 }
                 .item-actions {
                     display: none;
@@ -741,6 +871,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                         } else {
                             content.textContent = item.content;
                             content.title = item.content;
+                            content.classList.add('text-mode');
                         }
                         el.appendChild(content);
                         
