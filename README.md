@@ -46,6 +46,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Release Notes
 
+### 0.0.10
+- **Add Folder Structure**: New context menu command to add a complete directory tree of any folder to your context.
+- **Add File Structure**: Improved the "Add File Structure" command to visualize files currently in your list.
+- **UI Fixes**: Fixed truncation issue where long text notes or structures were cut off (aka the "snippet" bug).
+
+
 ### 0.0.9
 - **Multi-Select**: Added support for selecting multiple items using `Ctrl/Cmd` + Click or `Shift` + Click.
 - **Batch Actions**: Added "Copy Selected" and "Delete Selected" buttons for batch operations.

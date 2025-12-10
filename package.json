@@ -2,7 +2,7 @@
   "name": "context-hopper",
   "displayName": "Context Hopper",
   "description": "Gather code context for AI agents",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "publisher": "LihSheng",
   "author": {
     "name": "LihSheng"
