@@ -1,14 +1,13 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { encodingForModel } from 'js-tiktoken';
+
 import { ContextWebviewProvider, ContextItem } from './contextWebviewProvider';
 import { SavedContextTreeProvider, SavedGroup } from './savedContextTreeProvider';
 
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Congratulations, your extension "context-hopper" is now active!');
 
-    // Initialize tokenizer
-    const enc = encodingForModel('gpt-4');
+
 
 	const contextWebviewProvider = new ContextWebviewProvider(context.extensionUri, context);
 	context.subscriptions.push(
@@ -21,7 +20,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Helper to add a single file
     const addFileToContext = async (uri: vscode.Uri, range?: vscode.Range) => {
-        let tokens = 0;
+
         try {
             const doc = await vscode.workspace.openTextDocument(uri);
             let text = '';
@@ -30,8 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
             } else {
                 text = doc.getText();
             }
-            // Accurate token count using js-tiktoken
-            tokens = enc.encode(text).length;
+
 
             const item: ContextItem = {
                 id: Date.now().toString() + Math.random().toString().slice(2), // Unique ID
@@ -39,8 +37,7 @@ export function activate(context: vscode.ExtensionContext) {
                 content: uri.fsPath,
                 label: path.basename(uri.fsPath),
                 languageId: doc.languageId,
-                range: range ? { start: range.start.line, end: range.end.line } : undefined,
-                tokens: tokens
+                range: range ? { start: range.start.line, end: range.end.line } : undefined
             };
             contextWebviewProvider.addItem(item);
         } catch (e) {
@@ -144,6 +141,12 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.commands.registerCommand('context-hopper.addFileStructure', () => {
         contextWebviewProvider.addFileStructure();
     }));
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('context-hopper.refresh', () => {
+			contextWebviewProvider.refresh();
+		})
+	);
 
     context.subscriptions.push(vscode.commands.registerCommand('context-hopper.addFolderStructure', (uri: vscode.Uri) => {
         contextWebviewProvider.addFolderStructure(uri);

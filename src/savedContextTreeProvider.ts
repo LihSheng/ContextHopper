@@ -6,7 +6,7 @@ export interface SavedGroup {
     name: string;
     items: ContextItem[];
     pinned: boolean;
-    totalTokens: number;
+
     createdAt: number;
 }
 
@@ -25,7 +25,7 @@ export class SavedContextTreeProvider implements vscode.TreeDataProvider<SavedGr
             // It's a Group
             const treeItem = new vscode.TreeItem(element.name, vscode.TreeItemCollapsibleState.Collapsed);
             treeItem.contextValue = 'savedGroup';
-            treeItem.description = `~${element.totalTokens} tokens`;
+
             treeItem.tooltip = `${element.items.length} items`;
             
             // Icons
@@ -79,14 +79,13 @@ export class SavedContextTreeProvider implements vscode.TreeDataProvider<SavedGr
 
     public async saveGroup(name: string, items: ContextItem[]) {
         const groups = this.getGroups();
-        const totalTokens = items.reduce((sum, item) => sum + (item.tokens || 0), 0);
+
         
         const newGroup: SavedGroup = {
             id: Date.now().toString(),
             name,
             items: JSON.parse(JSON.stringify(items)),
             pinned: false,
-            totalTokens,
             createdAt: Date.now()
         };
 

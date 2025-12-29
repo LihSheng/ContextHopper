@@ -83,6 +83,11 @@
         "command": "context-hopper.addFolderStructure",
         "title": "Add Folder Structure",
         "icon": "$(list-tree)"
+      },
+      {
+        "command": "context-hopper.refresh",
+        "title": "Refresh",
+        "icon": "$(refresh)"
       }
     ],
     "viewsContainers": {
@@ -133,6 +138,11 @@
         },
         {
           "command": "context-hopper.addFileStructure",
+          "when": "view == context-hopper-view",
+          "group": "navigation"
+        },
+        {
+          "command": "context-hopper.refresh",
           "when": "view == context-hopper-view",
           "group": "navigation"
         }
@@ -215,7 +225,6 @@
     "typescript": "^5.1.3"
   },
   "dependencies": {
-    "@vscode/codicons": "^0.0.43",
-    "js-tiktoken": "^1.0.21"
+    "@vscode/codicons": "^0.0.43"
   }
 }

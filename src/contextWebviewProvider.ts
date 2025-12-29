@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { encodingForModel } from 'js-tiktoken';
+
 import { scrubSecrets } from './utils/secretScrubber';
 import { optimizeCode, OptimizationOptions } from './utils/contextOptimizer';
 
@@ -11,7 +11,7 @@ export interface ContextItem {
     label?: string;
     languageId?: string;
     range?: { start: number; end: number }; // Line numbers (0-indexed)
-    tokens?: number;
+
 }
 
 export class ContextWebviewProvider implements vscode.WebviewViewProvider {
@@ -19,7 +19,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
 
     private _view?: vscode.WebviewView;
     private _items: ContextItem[] = [];
-    private _enc = encodingForModel('gpt-4');
+
     private _optimizationSettings: OptimizationOptions = {
         removeComments: false,
         removeEmptyLines: false
@@ -101,6 +101,10 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
         });
     }
 
+    public refresh() {
+        this._updateWebview();
+    }
+
     public addItem(item: ContextItem) {
         // Deduplication: Check if item with same content (path) already exists
         const exists = this._items.some(existing => 
@@ -145,8 +149,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
         const item: ContextItem = {
             id: Date.now().toString(),
             type: 'text',
-            content: text,
-            tokens: this._enc.encode(text).length
+            content: text
         };
         this._items.push(item);
         this._saveState();
@@ -155,7 +158,6 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
 
     private async toggleOptimization(setting: keyof OptimizationOptions, value: boolean) {
         this._optimizationSettings[setting] = value;
-        await this._recalculateTokens();
         this._updateWebview();
         // Also update settings in UI
         if (this._view) {
@@ -189,7 +191,6 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
             };
             
             this._optimizationSettings = newSettings;
-            await this._recalculateTokens();
             this._updateWebview();
              if (this._view) {
                  this._view.webview.postMessage({ type: 'update-optimization-settings', settings: this._optimizationSettings });
@@ -197,35 +198,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    private async _recalculateTokens() {
-        for (const item of this._items) {
-            if (item.type === 'file') {
-                try {
-                    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(item.content));
-                    let text = '';
-                    if (item.range) {
-                        const range = new vscode.Range(item.range.start, 0, item.range.end, 1000);
-                        text = doc.getText(range);
-                    } else {
-                        text = doc.getText();
-                    }
-                    
-                    // Apply optimizations for token calculation
-                    const optimized = optimizeCode(text, item.languageId || 'plaintext', this._optimizationSettings);
-                    item.tokens = this._enc.encode(optimized).length;
-                } catch (e) {
-                    console.error('Error recalculating tokens:', e);
-                }
-            } else if (item.type === 'text') {
-                 // Optimize notes too? Maybe just whitespace.
-                 let text = item.content;
-                 if (this._optimizationSettings.removeEmptyLines) {
-                     text = text.replace(/^\s*[\r\n]/gm, '').replace(/\n{3,}/g, '\n\n').trim();
-                 }
-                 item.tokens = this._enc.encode(text).length;
-            }
-        }
-    }
+
 
     private openFile(filePath: string, range?: { start: number; end: number }) {
         const uri = vscode.Uri.file(filePath);
@@ -632,6 +605,17 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                 #active-indicator {
                     color: var(--vscode-charts-yellow); /* Or textLink-activeForeground */
                 }
+                .empty-state {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    height: 100%;
+                    color: var(--vscode-descriptionForeground);
+                    text-align: center;
+                    padding: 20px;
+                    font-style: italic;
+                }
                 #settings-btn {
                     cursor: pointer;
                     padding: 4px;
@@ -688,10 +672,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
             <div id="list"></div>
             <div id="footer">
                 <div id="footer-content">
-                    <div id="token-area">
-                        <span id="token-display">Total Tokens: 0</span>
-                        <span id="active-indicator" class="codicon codicon-zap" title="Optimizations Active" style="display: none;"></span>
-                    </div>
+
                     <div id="settings-area">
                         <div id="settings-btn" class="icon-btn" title="Output Settings">
                             <span class="codicon codicon-gear"></span>
@@ -709,8 +690,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
             <script>
                 const vscode = acquireVsCodeApi();
                 const list = document.getElementById('list');
-                const tokenDisplay = document.getElementById('token-display');
-                const activeIndicator = document.getElementById('active-indicator');
+
                 const noteInput = document.getElementById('note-input');
                 const addBtn = document.getElementById('add-btn');
                 const settingsBtn = document.getElementById('settings-btn');
@@ -750,10 +730,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                     }
                 });
 
-                function updateFooter() {
-                    const isActive = optimizationSettings.removeComments || optimizationSettings.removeEmptyLines;
-                    activeIndicator.style.display = isActive ? 'block' : 'none';
-                }
+
 
                 // Auto-resize textarea
                 noteInput.addEventListener('input', function() {
@@ -807,7 +784,12 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                 // Render List
                 function render() {
                     list.innerHTML = '';
-                    let totalTokens = 0;
+
+                    if (items.length === 0) {
+                        list.innerHTML = '<div class="empty-state">No context items yet.<br>Add files or notes to get started.</div>';
+                        return;
+                    }
+
 
                     items.forEach(item => {
                         const el = document.createElement('div');
@@ -892,15 +874,10 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
 
                         list.appendChild(el);
 
-                        if (item.tokens) {
-                            totalTokens += item.tokens;
-                        } else {
-                            // Fallback estimate
-                            totalTokens += Math.ceil(item.content.length / 4);
-                        }
+
                     });
 
-                    tokenDisplay.textContent = \`Total Tokens: \${totalTokens}\`;
+
                 }
             </script>
         </body>
