@@ -49,6 +49,19 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Release Notes
 
+### 0.0.14
+- **Documentation**: Updated release notes to keep the README current.
+
+### 0.0.13
+- **Logo Update**: Added official extension logo.
+
+### 0.0.12
+- **Interactive File Structure Generation**: Added a QuickPick checklist when using "Add File Structure" or "Add Folder Structure", allowing users to select or unselect exactly which files to include in the context tree.
+
+### 0.0.11
+- **Refresh Button**: Added a refresh button to the Context Items view title bar to manually sync the view.
+- **Empty State Message**: Added a helpful message when the context list is empty.
+
 ### 0.0.10
 - **Add Folder Structure**: New context menu command to add a complete directory tree of any folder to your context.
 - **Add File Structure**: Improved the "Add File Structure" command to visualize files currently in your list.
