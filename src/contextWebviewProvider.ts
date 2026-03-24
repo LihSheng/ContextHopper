@@ -320,7 +320,7 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
         vscode.window.showInformationMessage(`Copied ${itemsToCopy.length} items to clipboard.${redactedMsg}`);
     }
 
-    public addFileStructure() {
+    public async addFileStructure() {
         const fileItems = this._items.filter(item => item.type === 'file');
         if (fileItems.length === 0) {
             vscode.window.showInformationMessage('No file items to generate structure from.');
@@ -328,7 +328,26 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
         }
 
         const filePaths = fileItems.map(item => item.content);
-        const tree = this._generateTree(filePaths);
+        const commonAncestor = this._getCommonAncestor(filePaths);
+
+        const quickPickItems: (vscode.QuickPickItem & { fspath: string })[] = filePaths.map(p => ({
+            label: path.basename(p),
+            description: path.relative(commonAncestor, p) || path.basename(commonAncestor),
+            picked: true,
+            fspath: p
+        }));
+
+        const selected = await vscode.window.showQuickPick(quickPickItems, {
+            canPickMany: true,
+            placeHolder: 'Select files to include in the structure tree'
+        });
+
+        if (!selected || selected.length === 0) {
+            return;
+        }
+
+        const selectedPaths = selected.map(s => s.fspath);
+        const tree = this._generateTree(selectedPaths, commonAncestor);
         
         this.addNote(`File Structure (Context Items):\n\n${tree}`);
         vscode.window.showInformationMessage('Added context file structure.');
@@ -358,8 +377,27 @@ export class ContextWebviewProvider implements vscode.WebviewViewProvider {
                 }
 
                 const filePaths = files.map(f => f.fsPath);
+                
+                const quickPickItems: (vscode.QuickPickItem & { fspath: string })[] = filePaths.map(p => ({
+                    label: path.basename(p),
+                    description: path.relative(folderUri.fsPath, p),
+                    picked: true,
+                    fspath: p
+                }));
+
+                const selected = await vscode.window.showQuickPick(quickPickItems, {
+                    canPickMany: true,
+                    placeHolder: 'Select files to include in the folder tree',
+                    ignoreFocusOut: true
+                }, token);
+
+                if (!selected || selected.length === 0) {
+                    return;
+                }
+
+                const selectedPaths = selected.map(s => s.fspath);
                 // We generate the tree from the selected folder URI as root
-                const tree = this._generateTree(filePaths, folderUri.fsPath);
+                const tree = this._generateTree(selectedPaths, folderUri.fsPath);
                 
                 this.addNote(`Folder Structure: ${path.basename(folderUri.fsPath)}\n\n${tree}`);
                 vscode.window.showInformationMessage('Added folder structure to context.');
