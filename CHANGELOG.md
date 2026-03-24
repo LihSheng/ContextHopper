@@ -2,11 +2,6 @@
 
 All notable changes to the "Context Hopper" extension will be documented in this file.
 
-## [0.0.14] - 2026-03-24
-
-### Added
-- **Documentation**: Updated README.md with missing historical release notes (0.0.11, 0.0.12, 0.0.13).
-
 ## [0.0.13] - 2026-03-24
 
 ### Added
