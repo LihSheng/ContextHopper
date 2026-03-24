@@ -2,6 +2,11 @@
 
 All notable changes to the "Context Hopper" extension will be documented in this file.
 
+## [0.0.13] - 2026-03-24
+
+### Added
+- **Logo Update**: Added official extension logo.
+
 ## [0.0.12] - 2026-03-24
 
 ### Added
