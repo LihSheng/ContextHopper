@@ -36,9 +36,12 @@ A dedicated sidebar view in the Activity Bar lets you manage your gathered conte
 
 ## Usage
 
+For a detailed guide on how to gather context, generate file structures, use the Chatbox, and optimize tokens, please see our [User Manual](MANUAL.md).
+
 1.  **Gather**: Right-click files or selections and choose **Add to Context**.
-2.  **Annotate**: Use the chatbox to add custom instructions.
-3.  **Export**: Click the **Copy** icon and paste it where you need it!
+2.  **Structuring**: Use **Add File Structure** or **Add Folder Structure** to generate directory trees.
+3.  **Annotate**: Use the chatbox to add custom instructions.
+4.  **Export**: Click the **Copy** icon and paste it where you need it!
 
 ## License
 
